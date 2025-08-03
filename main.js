@@ -40,7 +40,6 @@ hands.onResults((results) => {
     const wristWidth = Math.sqrt(dx * dx + dy * dy);
 
     let angle = Math.atan2(dy, dx);
-
     let deg = angle * (180 / Math.PI);
     deg = (deg + 360) % 180;
 
@@ -71,8 +70,8 @@ hands.onResults((results) => {
   }
 });
 
-// Start camera and MediaPipe pipeline
-navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } })
+// ✅ Flexible camera constraint here
+navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
   .then((stream) => {
     videoElement.srcObject = stream;
 
