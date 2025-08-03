@@ -3,100 +3,103 @@ const canvasElement = document.getElementById('output');
 const canvasCtx = canvasElement.getContext('2d');
 
 const rakhiImg = new Image();
-rakhiImg.src = 'rakhi.png'; // make sure this file exists in same folder
+rakhiImg.src = 'rakhi.png'; // Ensure this file is in the same folder
 
 let lastPosition = null;
 let noHandFrames = 0;
 const maxNoHandFrames = 10;
 
-navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then((stream) => {
-  videoElement.srcObject = stream;
+// Set up MediaPipe Hands
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
+});
 
-  videoElement.onloadedmetadata = () => {
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 0,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7,
+});
 
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-    });
+hands.onResults((results) => {
+  canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 0,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7,
-    });
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    noHandFrames = 0;
+    const landmarks = results.multiHandLandmarks[0];
+    const wrist = landmarks[0];
+    const pinkyBase = landmarks[17];
+    const indexBase = landmarks[5];
 
-    hands.onResults((results) => {
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+    const x = wrist.x * canvasElement.width;
+    const y = wrist.y * canvasElement.height;
 
-      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        noHandFrames = 0;
-        const landmarks = results.multiHandLandmarks[0];
-        const wrist = landmarks[0];
-        const pinkyBase = landmarks[17];
-        const indexBase = landmarks[5];
+    const dx = (indexBase.x - pinkyBase.x) * canvasElement.width;
+    const dy = (indexBase.y - pinkyBase.y) * canvasElement.height;
+    const wristWidth = Math.sqrt(dx * dx + dy * dy);
 
-        const x = wrist.x * canvasElement.width;
-        const y = wrist.y * canvasElement.height;
+    let angle = Math.atan2(dy, dx);
 
-        const dx = (indexBase.x - pinkyBase.x) * canvasElement.width;
-        const dy = (indexBase.y - pinkyBase.y) * canvasElement.height;
-        const wristWidth = Math.sqrt(dx * dx + dy * dy);
+    let deg = angle * (180 / Math.PI);
+    deg = (deg + 360) % 180;
 
-        let angle = Math.atan2(dy, dx);
+    if (deg > 60 && deg < 120) {
+      angle += Math.PI / 2;
+    }
 
-        // Determine if wrist is vertical — rotate rakhi by 90 deg
-        let deg = angle * (180 / Math.PI);
-        deg = (deg + 360) % 180;
+    lastPosition = { x, y, angle, wristWidth };
+  } else {
+    noHandFrames++;
+  }
 
-        if (deg > 60 && deg < 120) {
-          angle += Math.PI / 2;
-        }
+  if (lastPosition && noHandFrames < maxNoHandFrames) {
+    const rakhiWidth = lastPosition.wristWidth * 2.5;
+    const rakhiHeight = rakhiWidth * (rakhiImg.height / rakhiImg.width);
 
-        lastPosition = { x, y, angle, wristWidth };
-      } else {
-        noHandFrames++;
-      }
+    canvasCtx.save();
+    canvasCtx.translate(lastPosition.x, lastPosition.y);
+    canvasCtx.rotate(lastPosition.angle);
+    canvasCtx.drawImage(
+      rakhiImg,
+      -rakhiWidth / 2,
+      -rakhiHeight / 2,
+      rakhiWidth,
+      rakhiHeight
+    );
+    canvasCtx.restore();
+  }
+});
 
-      if (lastPosition && noHandFrames < maxNoHandFrames) {
-        const rakhiWidth = lastPosition.wristWidth * 2.5;
-        const rakhiHeight = rakhiWidth * (rakhiImg.height / rakhiImg.width);
+// Start camera and MediaPipe pipeline
+navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } })
+  .then((stream) => {
+    videoElement.srcObject = stream;
 
-        canvasCtx.save();
-        canvasCtx.translate(lastPosition.x, lastPosition.y);
-        canvasCtx.rotate(lastPosition.angle);
-        canvasCtx.drawImage(
-          rakhiImg,
-          -rakhiWidth / 2,
-          -rakhiHeight / 2,
-          rakhiWidth,
-          rakhiHeight
-        );
-        canvasCtx.restore();
-      }
-    });
+    videoElement.onloadedmetadata = () => {
+      canvasElement.width = videoElement.videoWidth;
+      canvasElement.height = videoElement.videoHeight;
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
-      },
-      width: 640,
-      height: 480,
-    });
+      const camera = new Camera(videoElement, {
+        onFrame: async () => {
+          await hands.send({ image: videoElement });
+        },
+        width: 640,
+        height: 480,
+      });
 
-    camera.start();
-  };
-  document.getElementById('captureBtn').addEventListener('click', () => {
-  const canvas = document.getElementById('output');
-  const dataUrl = canvas.toDataURL('image/png');
+      camera.start();
+    };
+  })
+  .catch((err) => {
+    console.error('Camera error:', err);
+  });
 
+// Handle photo capture
+document.getElementById('captureBtn').addEventListener('click', () => {
+  const dataUrl = canvasElement.toDataURL('image/png');
   const link = document.createElement('a');
   link.href = dataUrl;
   link.download = 'samay_rakhi_photo.png';
   link.click();
-});
-
-
 });
