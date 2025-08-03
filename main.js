@@ -72,6 +72,7 @@ hands.onResults((results) => {
 
 // ✅ Flexible camera constraint here
 navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
+
   .then((stream) => {
     videoElement.srcObject = stream;
 
@@ -102,3 +103,4 @@ document.getElementById('captureBtn').addEventListener('click', () => {
   link.download = 'samay_rakhi_photo.png';
   link.click();
 });
+
