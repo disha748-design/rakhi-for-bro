@@ -3,13 +3,13 @@ const canvasElement = document.getElementById('output');
 const canvasCtx = canvasElement.getContext('2d');
 
 const rakhiImg = new Image();
-rakhiImg.src = 'rakhi.png'; // Ensure this file is in the same folder
+rakhiImg.src = 'rakhi.png'; // Make sure this file exists
 
 let lastPosition = null;
 let noHandFrames = 0;
 const maxNoHandFrames = 10;
 
-// Set up MediaPipe Hands
+// MediaPipe Hands setup
 const hands = new Hands({
   locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
 });
@@ -27,6 +27,7 @@ hands.onResults((results) => {
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     noHandFrames = 0;
+
     const landmarks = results.multiHandLandmarks[0];
     const wrist = landmarks[0];
     const pinkyBase = landmarks[17];
@@ -39,13 +40,8 @@ hands.onResults((results) => {
     const dy = (indexBase.y - pinkyBase.y) * canvasElement.height;
     const wristWidth = Math.sqrt(dx * dx + dy * dy);
 
+    // 🟢 Use only natural angle (remove the forced snap to horizontal)
     let angle = Math.atan2(dy, dx);
-    let deg = angle * (180 / Math.PI);
-    deg = (deg + 360) % 180;
-
-    if (deg > 60 && deg < 120) {
-      angle += Math.PI / 2;
-    }
 
     lastPosition = { x, y, angle, wristWidth };
   } else {
@@ -70,9 +66,8 @@ hands.onResults((results) => {
   }
 });
 
-// ✅ Flexible camera constraint here
-navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
-
+// Start the camera
+navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
   .then((stream) => {
     videoElement.srcObject = stream;
 
@@ -95,7 +90,7 @@ navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment
     console.error('Camera error:', err);
   });
 
-// Handle photo capture
+// Capture photo logic
 document.getElementById('captureBtn').addEventListener('click', () => {
   const dataUrl = canvasElement.toDataURL('image/png');
   const link = document.createElement('a');
@@ -103,4 +98,3 @@ document.getElementById('captureBtn').addEventListener('click', () => {
   link.download = 'samay_rakhi_photo.png';
   link.click();
 });
-
